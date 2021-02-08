@@ -1,133 +1,93 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+import os
+import sys
+import json
 import requests
-import re
-import time
-import hashlib
-import random
-import string
+import logging
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'
-}
+logging.basicConfig(level=logging.WARNING,
+                    format='%(asctime)s - %(filename)s [line:%(lineno)d] - %(levelname)s: %(message)s')
+# usage:
+# logging.debug('this is a loggging debug message')
+# logging.warning('this is loggging a warning message')
+# logging.error('this is an loggging error message')
+# logging.critical('this is a loggging critical message')
 
-url_login = 'https://www.t00ls.net/login.html'
-url_checklogin = 'https://www.t00ls.net/checklogin.html'
-url_signin = 'https://www.t00ls.net/ajax-sign.json'
-url_querydomain = 'https://www.t00ls.net/domain.html'
-url_tubilog = 'https://www.t00ls.net/members-tubilog-{0}.html'
+username = os.environ['USERNAME1']       # 帐号
+password = os.environ['PASSWORD1']       # 密码MD5 32位(小写)
+question_num = os.environ['QUESTION1']   # 安全提问 参考下面
+question_answer = os.environ['ANSWER1']  # 安全提问答案
 
-def get_formhash(req):
-    res = req.get(url=url_login, headers=headers)
-    formhash_1 = re.findall('value=\"[0-9a-f]{8}\"', res.content)
-    formhash = re.findall('[0-9a-f]{8}', formhash_1[0])[0]
-    time.sleep(1)
-    return req, formhash
+# 0 = 没有安全提问
+# 1 = 母亲的名字
+# 2 = 爷爷的名字
+# 3 = 父亲出生的城市
+# 4 = 您其中一位老师的名字
+# 5 = 您个人计算机的型号
+# 6 = 您最喜欢的餐馆名称
+# 7 = 驾驶执照的最后四位数字
 
-def pack_header(uid):
-    headers['Referer'] = 'https://www.t00ls.net/members-profile-{uid}.html'.format(uid=uid)
-    return headers
 
-def get_current_user(res, username):
-    # print str(res).decode('utf-8')
-    current_user = re.findall(r'<a href="members-profile-[\d+].*\.html" target="_blank">{username}</a>'.format(username=username), res)
-    # print ''.join(current_user)
-    cuser = re.findall(r'[\d+]{4,5}', ''.join(current_user))[0]
-    print cuser
-    return cuser
-
-def login_t00ls(req, info):
-    formhash = get_formhash(req)
-    passwords = info['password'] if info['password_hash'] else hashlib.md5(info['password']).hexdigest()
-    data = {
-        'username': info['username'],
-        'password': passwords,
-        'questionid': info['questionid'],
-        'answer': info['answer'],
-        'formhash': formhash,
-        'loginsubmit': '登录',
-        'redirect': 'https://www.t00ls.net',
-        'cookietime': '2592000'
+def t00ls_login(u_name, u_pass, q_num, q_ans):
+    """
+    t00ls 登录函数
+    :param u_name: 用户名
+    :param u_pass: 密码的 md5 值 32 位小写
+    :param q_num: 安全提问类型
+    :param q_ans: 安全提问答案
+    :return: 签到要用的 hash 和 登录后的 Cookies
+    """
+    login_data = {
+        'action': 'login',
+        'username': u_name,
+        'password': u_pass,
+        'questionid': q_num,
+        'answer': q_ans
     }
+    response_login = requests.post('https://www.t00ls.net/login.json', data=login_data)
+    response_login_json = json.loads(response_login.text)
 
-    headers['Referer'] = 'https://www.t00ls.net/'
-    res = req.post(url=url_login, headers=headers, data=data)
-    time.sleep(1)
-    return res, formhash
-
-def get_domain():
-    length = random.randint(4,6)
-    domain = ''.join(random.sample(string.lowercase, length))
-    domain += '.com'
-    return domain
-
-def get_formhash_1(req, username):
-    res = req.get(url=url_checklogin, headers=headers)
-    uid = get_current_user(res.content, username)
-    formhash = re.findall('[0-9a-f]{8}', res.content)[0]
-    return formhash, uid
-
-def check_domain(req, domain, uid):
-    headers['Referer'] = url_querydomain
-    res = req.get(url=url_tubilog.format(uid), headers=headers)
-    if domain in res.content:
-        return True
+    if response_login_json['status'] != 'success':
+        return None
     else:
-        return False
+        logging.warning("用户: {0} 登入成功!".format(username))
+        formhash = response_login_json['formhash']
+        t00ls_cookies = response_login.cookies
+        return formhash, t00ls_cookies
 
-def query_domain(req, formhash, headers, uid):
-    domain = get_domain()
-    data = {
-        'domain': domain,
-        'formhash': formhash,
-        'querydomainsubmit': '查询'
-    }
-    res = req.post(url=url_querydomain, headers=headers, data=data)
-    time.sleep(1)
-    if '1 TuBi<br>' not in res.content and not check_domain(req, domain, uid):
-        res = query_domain(req, formhash, headers, uid)
-    return domain
 
-def signin_t00ls(req, formhash, headers):
-    data = {
-        'formhash': formhash,
-        'signsubmit': 'apply'
+def t00ls_sign(t00ls_hash, t00ls_cookies):
+    """
+    t00ls 签到函数
+    :param t00ls_hash: 签到要用的 hash
+    :param t00ls_cookies: 登录后的 Cookies
+    :return: 签到后的 JSON 数据
+    """
+    sign_data = {
+        'formhash': t00ls_hash,
+        'signsubmit': "true"
     }
-    res = req.post(url=url_signin, data=data, headers=headers)
-    return res
+    response_sign = requests.post('https://www.t00ls.net/ajax-sign.json', data=sign_data, cookies=t00ls_cookies)
+    return json.loads(response_sign.text)
+
 
 def main():
-    # questionid
-    # 1 母亲的名字
-    # 2 爷爷的名字
-    # 3 父亲出生的城市
-    # 4 您其中一位老师的名字
-    # 5 您个人计算机的型号
-    # 6 您最喜欢的餐馆名称
-    # 7 驾驶执照的最后四位数字
-
-    info = [
-        {
-            'username': 'amiee',
-            'password': '259b89351157f28cd4ffb1eb715b784c',
-            'password_hash': True,
-            'questionid': '3',
-            'answer': '湖南衡阳'
-        }
-    ]
-    for s_info in info:
-        print s_info
-        req = requests.session()
-        login_t00ls(req, s_info)
-        formhash, uid = get_formhash_1(req, s_info['username'])
-        headers = pack_header(uid)
-        res_signin = signin_t00ls(req, formhash, headers)
-        print res_signin.content
-        time.sleep(1)
-        res_domain = query_domain(req, formhash, headers, uid)
-        print res_domain
-        requests.session().close()
-    print time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    response_login = t00ls_login(username, password, question_num, question_answer)
+    if response_login:
+        response_sign = t00ls_sign(response_login[0], response_login[1])
+        if response_sign['status'] == 'success':
+            logging.warning("签到成功")
+        elif response_sign['message'] == 'alreadysign':
+            logging.warning("今日已签到")
+        else:
+            logging.error("出现玄学问题了,签到失败")
+            sys.exit(1)
+    else:
+        logging.error("登录失败,请检查输入资料是否正确")
+        sys.exit(1)
 
 
-if '__main__' == __name__:
+if __name__ == '__main__':
     main()
