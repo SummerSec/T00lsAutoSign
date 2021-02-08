@@ -28,4 +28,6 @@ jobs:
                 PASSWORD: ${{ secrets.PASSWORD }}
                 QUESTION: ${{ secrets.QUESTION }}
                 ANSWER: ${{ secrets.ANSWER }}
-              run: python t00ls.py
+              run: python t00ls.py & python t00ls2.py
+          
+              
