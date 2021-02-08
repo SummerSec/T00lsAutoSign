@@ -32,6 +32,7 @@ jobs:
                 PASSWORD1: ${{ secrets.PASSWORD1 }}
                 QUESTION1: ${{ secrets.QUESTION1 }}
                 ANSWER1: ${{ secrets.ANSWER1 }}
+                SCKEY:  ${{secrets.SCKEY}}
               run: python t00ls.py & python t00ls2.py
           
               
