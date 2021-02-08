@@ -20,7 +20,7 @@ password = os.environ['PASSWORD']       # 密码MD5 32位(小写)
 question_num = os.environ['QUESTION']   # 安全提问 参考下面
 question_answer = os.environ['ANSWER']  # 安全提问答案
 sckey = os.environ['SCKEY'] # 
-sckeyurl = "https://sc.ftqq.com/" + sckey + ".send?text=amiee-t00ls-sign-success"
+sckeyurl = "https://sc.ftqq.com/" + sckey + ".send?text=summersec-t00ls-sign-success"
 
 # 0 = 没有安全提问
 # 1 = 母亲的名字
