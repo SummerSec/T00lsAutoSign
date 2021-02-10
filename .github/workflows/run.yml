@@ -16,8 +16,8 @@ jobs:
             - name: Setup Python
               uses: actions/setup-python@v2
               with:
-#                 python-version: '3.8'
-                python-version: '2.7'
+                python-version: '3.8'
+#                 python-version: '2.7'
                 architecture: x64
             - name: Install dependencies
               run: |
@@ -34,8 +34,8 @@ jobs:
                 QUESTION1: ${{ secrets.QUESTION1 }}
                 ANSWER1: ${{ secrets.ANSWER1 }}
                 SCKEY:  ${{secrets.SCKEY}}
-#               run: python t00ls.py & python t00ls2.py
-              run: python 1.py 
+              run: python t00ls.py & python t00ls2.py
+#               run: python 1.py 
 
               
           
